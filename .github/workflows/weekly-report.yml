@@ -1,0 +1,128 @@
+name: Weekly GitHub Activity Report
+
+on:
+  schedule:
+    # 毎週月曜日の午前9時（JST）に実行
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      repos:
+        description: 'リポジトリ名（カンマ区切り、デフォルト: action-board,fact-checker）'
+        required: false
+        default: 'action-board,fact-checker'
+      days:
+        description: '過去何日分を取得するか'
+        required: false
+        default: '7'
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Setup GitHub CLI
+      run: |
+        gh auth login --with-token <<< "${{ secrets.GITHUB_TOKEN }}"
+    
+    - name: Generate GitHub Activity Report
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        # リポジトリ名を設定（デフォルトまたは入力値）
+        REPOS="${{ github.event.inputs.repos || 'action-board,fact-checker' }}"
+        DAYS="${{ github.event.inputs.days || '7' }}"
+        
+        # team-mirai-volunteer組織を付与
+        FULL_REPOS=""
+        for repo in $(echo $REPOS | tr ',' ' '); do
+          if [ -z "$FULL_REPOS" ]; then
+            FULL_REPOS="team-mirai-volunteer/$repo"
+          else
+            FULL_REPOS="$FULL_REPOS,team-mirai-volunteer/$repo"
+          fi
+        done
+        
+        echo "処理対象リポジトリ: $FULL_REPOS"
+        
+        # GitHubデータを収集してMarkdownレポートを生成
+        python -m src.github_logger.github_report \
+          --repo "$FULL_REPOS" \
+          --last-days "$DAYS" \
+          --markdown \
+          --output-dir "./data"
+    
+    - name: Generate AI Reports (if OpenAI API key is available)
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      run: |
+        if [ -n "$OPENAI_API_KEY" ]; then
+          echo "OpenAI APIキーが設定されているため、AIレポートを生成します"
+          
+          # action-board用AIレポート生成
+          if echo "${{ github.event.inputs.repos || 'action-board,fact-checker' }}" | grep -q "action-board"; then
+            python -m src.call_openai_api github \
+              --repo "team-mirai-volunteer/action-board" \
+              --prompt-file "./prompts/action_board_prompt.txt" \
+              --data-dir "./data" || echo "action-board AIレポート生成に失敗しました"
+          fi
+          
+          # fact-checker用AIレポート生成
+          if echo "${{ github.event.inputs.repos || 'action-board,fact-checker' }}" | grep -q "fact-checker"; then
+            python -m src.call_openai_api github \
+              --repo "team-mirai-volunteer/fact-checker" \
+              --prompt-file "./prompts/fact_checker_prompt.txt" \
+              --data-dir "./data" || echo "fact-checker AIレポート生成に失敗しました"
+          fi
+        else
+          echo "OpenAI APIキーが設定されていないため、AIレポートの生成をスキップします"
+        fi
+    
+    - name: Upload reports as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: github-activity-reports
+        path: |
+          data/*/markdown/github/*.md
+          data/*/ai_reports/*.md
+        retention-days: 30
+    
+    - name: Create summary
+      run: |
+        echo "## 📊 GitHub Activity Report Generated" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 生成されたファイル:" >> $GITHUB_STEP_SUMMARY
+        
+        # Markdownレポートファイルを一覧表示
+        if ls data/*/markdown/github/*.md 1> /dev/null 2>&1; then
+          echo "#### Markdownレポート:" >> $GITHUB_STEP_SUMMARY
+          for file in data/*/markdown/github/*.md; do
+            echo "- \`$(basename "$file")\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # AIレポートファイルを一覧表示
+        if ls data/*/ai_reports/*.md 1> /dev/null 2>&1; then
+          echo "#### AIレポート:" >> $GITHUB_STEP_SUMMARY
+          for file in data/*/ai_reports/*.md; do
+            echo "- \`$(basename "$file")\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "レポートはArtifactsからダウンロードできます。" >> $GITHUB_STEP_SUMMARY
