@@ -23,26 +23,118 @@ class LookerStudioExporter:
         self.devin_stat_dir = Path("../devin-stat")
         
     def collect_github_activity_data(self, days: int = 30) -> List[Dict[str, Any]]:
-        """GitHub活動データを収集"""
-        data_dir = Path("./data")
+        """GitHub活動データを収集（pr-dataリポジトリから）"""
         activity_data = []
+        from datetime import timezone
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
         
-        for repo_file in data_dir.glob("*/raw/github/*.json"):
-            repo_data = read_json_file(repo_file)
-            for item in repo_data:
+        if not self.pr_data_dir.exists():
+            print(f"警告: pr-dataディレクトリが見つかりません: {self.pr_data_dir}")
+            return activity_data
+        
+        print(f"pr-dataから過去{days}日間のGitHub活動データを収集中...")
+        
+        for pr_file in self.pr_data_dir.glob("*.json"):
+            try:
+                pr_data = read_json_file(pr_file)
+                if isinstance(pr_data, list) and pr_data:
+                    pr_data = pr_data[0]
+                
+                if not isinstance(pr_data, dict):
+                    continue
+                
+                basic_info = pr_data.get("basic_info", {})
+                created_at = basic_info.get("created_at", "")
+                
+                if not created_at:
+                    continue
+                
+                try:
+                    pr_date = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+                    if pr_date < cutoff_date:
+                        continue
+                except Exception as e:
+                    print(f"日時パースエラー (PR {pr_file.name}): {e}")
+                    continue
+                
+                user_info = basic_info.get("user", {})
+                user_login = user_info.get("login", "")
+                
+                devin_patterns = ["devin-ai-integration[bot]", "devin-ai-integration", "devin"]
+                is_devin = any(pattern in user_login.lower() for pattern in devin_patterns)
+                
                 activity_data.append({
                     "source": "github_activity",
-                    "repository": repo_file.stem,
-                    "type": item.get("type", "unknown"),
-                    "title": item.get("title", ""),
-                    "state": item.get("state", ""),
-                    "created_at": item.get("created_at", ""),
-                    "updated_at": item.get("updated_at", ""),
-                    "user": item.get("user", {}).get("login", ""),
-                    "labels": [label.get("name", "") for label in item.get("labels", [])],
-                    "comments_count": len(item.get("comments", [])),
+                    "repository": "team-mirai/policy",
+                    "type": "pull_request",
+                    "title": basic_info.get("title", ""),
+                    "state": basic_info.get("state", ""),
+                    "created_at": created_at,
+                    "updated_at": basic_info.get("updated_at", ""),
+                    "user": user_login,
+                    "labels": [label.get("name", "") for label in pr_data.get("labels", [])],
+                    "comments_count": len(pr_data.get("comments", [])) + len(pr_data.get("review_comments", [])),
+                    "is_devin": is_devin,
+                    "merged_at": basic_info.get("merged_at"),
+                    "files_changed": len(pr_data.get("files", [])),
+                    "commits_count": len(pr_data.get("commits", []))
                 })
+                
+                for comment in pr_data.get("comments", []):
+                    comment_date = comment.get("created_at", "")
+                    if comment_date:
+                        try:
+                            comment_dt = datetime.fromisoformat(comment_date.replace("Z", "+00:00"))
+                            if comment_dt >= cutoff_date:
+                                activity_data.append({
+                                    "source": "github_activity",
+                                    "repository": "team-mirai/policy",
+                                    "type": "comment",
+                                    "title": f"Comment on PR #{basic_info.get('number', '')}",
+                                    "state": "comment",
+                                    "created_at": comment_date,
+                                    "updated_at": comment.get("updated_at", ""),
+                                    "user": comment.get("user", {}).get("login", ""),
+                                    "labels": [],
+                                    "comments_count": 1,
+                                    "is_devin": False,
+                                    "merged_at": None,
+                                    "files_changed": 0,
+                                    "commits_count": 0
+                                })
+                        except:
+                            continue
+                
+                for review_comment in pr_data.get("review_comments", []):
+                    review_date = review_comment.get("created_at", "")
+                    if review_date:
+                        try:
+                            review_dt = datetime.fromisoformat(review_date.replace("Z", "+00:00"))
+                            if review_dt >= cutoff_date:
+                                activity_data.append({
+                                    "source": "github_activity",
+                                    "repository": "team-mirai/policy",
+                                    "type": "review_comment",
+                                    "title": f"Review comment on PR #{basic_info.get('number', '')}",
+                                    "state": "review_comment",
+                                    "created_at": review_date,
+                                    "updated_at": review_comment.get("updated_at", ""),
+                                    "user": review_comment.get("user", {}).get("login", ""),
+                                    "labels": [],
+                                    "comments_count": 1,
+                                    "is_devin": False,
+                                    "merged_at": None,
+                                    "files_changed": 0,
+                                    "commits_count": 0
+                                })
+                        except:
+                            continue
+                            
+            except Exception as e:
+                print(f"PR {pr_file.name} の処理中にエラー: {e}")
+                continue
         
+        print(f"GitHub活動データ {len(activity_data)} 件を収集しました")
         return activity_data
     
     def collect_devin_stats_data(self) -> List[Dict[str, Any]]:
@@ -189,7 +281,10 @@ class LookerStudioExporter:
                 "user": item.get("user", ""),
                 "labels": "|".join(item.get("labels", [])),
                 "comments_count": item.get("comments_count", 0),
-                "numeric_value": item.get("comments_count", 0)
+                "numeric_value": item.get("files_changed", 0) or item.get("commits_count", 0) or item.get("comments_count", 0),
+                "is_devin": item.get("is_devin", False),
+                "files_changed": item.get("files_changed", 0),
+                "commits_count": item.get("commits_count", 0)
             })
         
         for item in unified_data["devin_stats"]:
