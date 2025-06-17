@@ -126,3 +126,41 @@ jobs:
         fi
         
         echo "レポートはArtifactsからダウンロードできます。" >> $GITHUB_STEP_SUMMARY
+    
+    - name: Generate Looker Studio Export
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "Looker Studio用データエクスポートを生成中..."
+        
+        # 統合データエクスポート
+        python -m src.exporters.cli \
+          --format flat \
+          --days 30 \
+          --output-file "looker_studio_export.json" \
+          --output-dir "./data"
+        
+        # 長期統計用（90日）
+        python -m src.exporters.cli \
+          --format flat \
+          --days 90 \
+          --output-file "looker_studio_export_90d.json" \
+          --output-dir "./data"
+    
+    - name: Upload Looker Studio data as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: looker-studio-exports
+        path: |
+          data/looker_studio_export*.json
+        retention-days: 90
+    
+    - name: Update summary with Looker Studio info
+      run: |
+        echo "### 📊 Looker Studio Export" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Looker Studio用のデータエクスポートが生成されました：" >> $GITHUB_STEP_SUMMARY
+        echo "- \`looker_studio_export.json\` (30日分)" >> $GITHUB_STEP_SUMMARY
+        echo "- \`looker_studio_export_90d.json\` (90日分)" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "これらのファイルをGoogle Sheetsにインポートして、Looker Studioで可視化できます。" >> $GITHUB_STEP_SUMMARY
