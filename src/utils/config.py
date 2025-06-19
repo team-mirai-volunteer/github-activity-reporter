@@ -28,6 +28,10 @@ class Config:
             "openai": {
                 "api_key": os.getenv("OPENAI_API_KEY"),
             },
+            "google": {
+                "credentials_file": os.getenv("GOOGLE_SHEETS_CREDENTIALS_FILE"),
+                "spreadsheet_id": os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID"),
+            },
             "output": {
                 "default_dir": os.getenv("OUTPUT_DIR", "./data"),
                 "timezone": os.getenv("TIMEZONE", "UTC"),
