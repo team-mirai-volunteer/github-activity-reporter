@@ -99,8 +99,31 @@ jobs:
         path: |
           data/*/markdown/github/*.md
           data/*/ai_reports/*.md
+          data/*/raw/commits/*.json
         retention-days: 30
     
+    - name: Collect Commit Statistics
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GOOGLE_SHEETS_CREDENTIALS_FILE: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS_FILE }}
+        GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+      run: |
+        if [ -n "$GOOGLE_SHEETS_CREDENTIALS_FILE" ] && [ -n "$GOOGLE_SHEETS_SPREADSHEET_ID" ]; then
+          echo "Google Sheets認証情報が設定されているため、コミット統計を収集します"
+          
+          # Google Sheets認証ファイルを作成
+          echo "$GOOGLE_SHEETS_CREDENTIALS_FILE" > /tmp/google-credentials.json
+          export GOOGLE_SHEETS_CREDENTIALS_FILE="/tmp/google-credentials.json"
+          
+          # コミット統計を収集してGoogle Sheetsに書き込み
+          python -m src.commit_collector \
+            --days 30 \
+            --output-dir "./data" \
+            --clear-sheet || echo "コミット統計の収集に失敗しました"
+        else
+          echo "Google Sheets認証情報が設定されていないため、コミット統計の収集をスキップします"
+        fi
+
     - name: Create summary
       run: |
         echo "## 📊 GitHub Activity Report Generated" >> $GITHUB_STEP_SUMMARY
@@ -120,6 +143,15 @@ jobs:
         if ls data/*/ai_reports/*.md 1> /dev/null 2>&1; then
           echo "#### AIレポート:" >> $GITHUB_STEP_SUMMARY
           for file in data/*/ai_reports/*.md; do
+            echo "- \`$(basename "$file")\`" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        # コミット統計ファイルを一覧表示
+        if ls data/*/raw/commits/*.json 1> /dev/null 2>&1; then
+          echo "#### コミット統計:" >> $GITHUB_STEP_SUMMARY
+          for file in data/*/raw/commits/*.json; do
             echo "- \`$(basename "$file")\`" >> $GITHUB_STEP_SUMMARY
           done
           echo "" >> $GITHUB_STEP_SUMMARY
