@@ -2,8 +2,8 @@ name: Weekly GitHub Activity Report
 
 on:
   schedule:
-    # 毎週月曜日の午前9時（JST）に実行
-    - cron: '0 0 * * 1'
+    # 毎日午前9時（JST）に実行
+    - cron: '0 0 * * *'
   workflow_dispatch:
     inputs:
       repos:
@@ -111,8 +111,8 @@ jobs:
         if [ -n "$GOOGLE_SHEETS_CREDENTIALS_FILE" ] && [ -n "$GOOGLE_SHEETS_SPREADSHEET_ID" ]; then
           echo "Google Sheets認証情報が設定されているため、コミット統計を収集します"
           
-          # Google Sheets認証ファイルを作成
-          echo "$GOOGLE_SHEETS_CREDENTIALS_FILE" > /tmp/google-credentials.json
+          # Google Sheets認証ファイルを作成（base64デコード）
+          echo "$GOOGLE_SHEETS_CREDENTIALS_FILE" | base64 -d > /tmp/google-credentials.json
           export GOOGLE_SHEETS_CREDENTIALS_FILE="/tmp/google-credentials.json"
           
           # コミット統計を収集してGoogle Sheetsに書き込み
