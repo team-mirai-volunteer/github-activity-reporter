@@ -109,7 +109,7 @@ class SheetsClient:
         except:
             worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows=1000, cols=10)
         
-        headers = ["Repository", "Author", "Date", "Count"]
+        headers = ["プロジェクト(repository)", "貢献者", "日時", "貢献数(commits)"]
         
         existing_data = worksheet.get_all_values()
         if not existing_data or existing_data[0] != headers:
