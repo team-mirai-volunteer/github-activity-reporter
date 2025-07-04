@@ -118,8 +118,9 @@ def extract_commit_data(
                     else:
                         formatted_date = ''
                     
+                    repo_name = repo.replace('team-mirai-volunteer/', '') if repo.startswith('team-mirai-volunteer/') else repo
                     processed_commit = {
-                        'repository': repo,
+                        'repository': repo_name,
                         'author': commit_data.get('author', 'unknown'),
                         'date': formatted_date,
                         'count': 1
