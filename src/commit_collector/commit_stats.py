@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from ..utils.config import Config
 from ..utils.file_utils import ensure_dir, write_json_file
 from ..utils.sheets_client import SheetsClient
+from ..utils.user_mapping import map_username
 
 
 def get_github_token() -> Optional[str]:
@@ -121,7 +122,7 @@ def extract_commit_data(
                     repo_name = repo.replace('team-mirai-volunteer/', '') if repo.startswith('team-mirai-volunteer/') else repo
                     processed_commit = {
                         'repository': repo_name,
-                        'author': commit_data.get('author', 'unknown'),
+                        'author': map_username(commit_data.get('author', 'unknown')),
                         'date': formatted_date,
                         'count': 1
                     }

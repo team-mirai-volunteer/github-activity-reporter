@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from ..utils.config import Config
 from ..utils.file_utils import ensure_dir, read_json_file, write_json_file, write_text_file
+from ..utils.user_mapping import map_username
 
 
 def get_github_token() -> Optional[str]:
@@ -167,7 +168,7 @@ def format_item(item: Dict[str, Any]) -> str:
     number = item.get("number", "N/A")
     title = item.get("title", "タイトルなし")
     state = item.get("state", "unknown")
-    author = item.get("author", {}).get("login", "unknown") if item.get("author") else "unknown"
+    author = map_username(item.get("author", {}).get("login", "unknown") if item.get("author") else "unknown")
     created_at = item.get("createdAt", "")
     updated_at = item.get("updatedAt", "")
     url = item.get("url", "")
