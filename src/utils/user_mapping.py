@@ -11,7 +11,8 @@ class UserNameMapper:
         ユーザー名マッピングを初期化
         """
         self._mapping = {
-            "kentamurai": "Murai Kenta"
+            "kentamurai": "Kenta Murai",
+            "muraikenta": "Kenta Murai"
         }
     
     def map_username(self, username: Optional[str]) -> str:
