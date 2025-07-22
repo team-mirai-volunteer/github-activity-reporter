@@ -61,7 +61,7 @@ def get_team_mirai_repos() -> List[str]:
 
 def extract_commit_data(
     repo: str,
-    days: int = 30,
+    since_date: str = "2025-05-01",
     timezone_str: str = "UTC"
 ) -> List[Dict[str, Any]]:
     """
@@ -69,7 +69,7 @@ def extract_commit_data(
     
     Args:
         repo: リポジトリ名（owner/repo形式）
-        days: 過去何日分を取得するか
+        since_date: 開始日（YYYY-MM-DD形式）
         timezone_str: タイムゾーン
         
     Returns:
@@ -80,10 +80,10 @@ def extract_commit_data(
         return []
     
     tz = timezone.utc if timezone_str == "UTC" else timezone(timedelta(hours=9))
-    since_date = datetime.now(tz) - timedelta(days=days)
-    since_iso = since_date.isoformat()
+    start_date = datetime.fromisoformat(since_date).replace(tzinfo=tz)
+    since_iso = start_date.isoformat()
     
-    print(f"リポジトリ {repo} からコミットデータを取得中... (過去{days}日間)")
+    print(f"リポジトリ {repo} からコミットデータを取得中... ({since_date}以降)")
     
     try:
         cmd = [
@@ -169,7 +169,7 @@ def aggregate_commit_data(commits: List[Dict[str, Any]]) -> List[Dict[str, Any]]
 
 def collect_all_commit_data(
     repos: Optional[List[str]] = None,
-    days: int = 30,
+    since_date: str = "2025-05-01",
     timezone_str: str = "UTC",
     output_dir: str = "./data"
 ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
@@ -178,7 +178,7 @@ def collect_all_commit_data(
     
     Args:
         repos: リポジトリのリスト（Noneの場合は全パブリックリポジトリ）
-        days: 過去何日分を取得するか
+        since_date: 開始日（YYYY-MM-DD形式）
         timezone_str: タイムゾーン
         output_dir: 出力ディレクトリ
         
@@ -194,7 +194,7 @@ def collect_all_commit_data(
     
     tz = timezone.utc if timezone_str == "UTC" else timezone(timedelta(hours=9))
     end_date = datetime.now(tz)
-    start_date = end_date - timedelta(days=days)
+    start_date = datetime.fromisoformat(since_date).replace(tzinfo=tz)
     
     date_range_dir = f"{start_date.date().isoformat()}_to_{end_date.date().isoformat()}"
     
@@ -205,7 +205,7 @@ def collect_all_commit_data(
     all_commits = []
     
     for repo in repos:
-        repo_commits = extract_commit_data(repo, days, timezone_str)
+        repo_commits = extract_commit_data(repo, since_date, timezone_str)
         all_commits.extend(repo_commits)
     
     if all_commits:
@@ -223,7 +223,7 @@ def collect_all_commit_data(
             "period": {
                 "start": start_date.date().isoformat(),
                 "end": end_date.date().isoformat(),
-                "days": days
+                "since_date": since_date
             },
             "repositories": repos
         }
