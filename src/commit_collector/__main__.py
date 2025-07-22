@@ -27,10 +27,9 @@ def main() -> int:
         help='リポジトリ名（カンマ区切り、指定しない場合は全パブリックリポジトリ）'
     )
     parser.add_argument(
-        '--days',
-        type=int,
-        help='過去何日分を取得するか',
-        default=30
+        '--since-date',
+        help='開始日（YYYY-MM-DD形式、指定しない場合は2025-05-01）',
+        default='2025-05-01'
     )
     parser.add_argument(
         '--output-dir',
@@ -74,7 +73,7 @@ def main() -> int:
         repos = full_repos
     
     print(f"コミットデータ収集を開始します...")
-    print(f"対象期間: 過去{args.days}日間")
+    print(f"対象期間: {args.since_date}以降")
     print(f"タイムゾーン: {args.timezone}")
     
     if repos:
@@ -84,7 +83,7 @@ def main() -> int:
     
     commit_data, json_file = collect_all_commit_data(
         repos=repos,
-        days=args.days,
+        since_date=args.since_date,
         timezone_str=args.timezone,
         output_dir=args.output_dir
     )
