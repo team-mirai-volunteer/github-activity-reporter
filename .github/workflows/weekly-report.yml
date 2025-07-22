@@ -117,7 +117,7 @@ jobs:
           
           # コミット統計を収集してGoogle Sheetsに書き込み
           python -m src.commit_collector \
-            --days 30 \
+            --days 36500 \
             --output-dir "./data" \
             --clear-sheet || echo "コミット統計の収集に失敗しました"
         else
